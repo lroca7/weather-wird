@@ -1,6 +1,7 @@
 package com.example.plugins
 
 import com.example.model.*
+import com.example.services.WeatherService
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.http.content.*
@@ -11,8 +12,12 @@ fun Application.configureRouting() {
     routing {
 
         staticResources("static", "static")
+
+        val apiKey = environment.config.property("ktor.application.apiKey").getString()
+        val weatherService = WeatherService(apiKey)
+
         get("/") {
-            call.respondText("Hello World Liz!")
+            call.respondText("Hello Liz!")
         }
 
         //updated implementation
@@ -56,5 +61,28 @@ fun Application.configureRouting() {
                 }
             }
         }
+
+
+        routing {
+            get("/weather/{location}") {
+                val location = call.parameters["location"] ?: return@get call.respondText("Location not provided", status = io.ktor.http.HttpStatusCode.BadRequest)
+
+                val weatherData = weatherService.getWeather(location)
+                if (weatherData != null) {
+                    call.respond(weatherData)
+                } else {
+                    call.respondText("Unable to fetch weather data", status = io.ktor.http.HttpStatusCode.ServiceUnavailable)
+                }
+            }
+
+            get("/weather/multiple") {
+                val locations = listOf("CL", "CH", "NZ", "AU", "UK", "USA")
+                val weatherData = weatherService.getWeatherForMultipleLocations(locations)
+
+                call.respond(weatherData)
+            }
+        }
+
+
     }
 }
