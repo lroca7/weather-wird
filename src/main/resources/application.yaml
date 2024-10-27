@@ -3,6 +3,9 @@ ktor:
     modules:
       - com.example.ApplicationKt.module
     apiKey: "xPjePVrbc0eP5RGa6qY4wTP8fFtIeA00"
+    redis:
+      url: "redis://redis-17921.c99.us-east-1-4.ec2.redns.redis-cloud.com:17921"
+      password: "yOAQoPfXetKcqHmV4FdqrtxG5IA73CCh"
   deployment:
-    port: 8083
+    port: 5000
 

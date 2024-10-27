@@ -1,14 +1,18 @@
 package com.example.plugins
 
 import com.example.model.*
+import com.example.services.RedisClient
 import com.example.services.WeatherService
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.http.content.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
+import kotlinx.serialization.json.Json
+import redis.clients.jedis.Jedis
 
 fun Application.configureRouting() {
+
     routing {
 
         staticResources("static", "static")
@@ -20,59 +24,39 @@ fun Application.configureRouting() {
             call.respondText("Hello Liz!")
         }
 
-        //updated implementation
-        route("/tasks") {
-            get {
-                val tasks = TaskRepository.allTasks()
-                call.respond(tasks)
-            }
-
-            get("/byName/{taskName}") {
-                val name = call.parameters["taskName"]
-                if (name == null) {
-                    call.respond(HttpStatusCode.BadRequest)
-                    return@get
-                }
-
-                val task = TaskRepository.taskByName(name)
-                if (task == null) {
-                    call.respond(HttpStatusCode.NotFound)
-                    return@get
-                }
-                call.respond(task)
-            }
-            get("/byPriority/{priority}") {
-                val priorityAsText = call.parameters["priority"]
-                if (priorityAsText == null) {
-                    call.respond(HttpStatusCode.BadRequest)
-                    return@get
-                }
-                try {
-                    val priority = Priority.valueOf(priorityAsText)
-                    val tasks = TaskRepository.tasksByPriority(priority)
-
-                    if (tasks.isEmpty()) {
-                        call.respond(HttpStatusCode.NotFound)
-                        return@get
-                    }
-                    call.respond(tasks)
-                } catch (ex: IllegalArgumentException) {
-                    call.respond(HttpStatusCode.BadRequest)
-                }
-            }
-        }
-
-
         routing {
-            get("/weather/{location}") {
-                val location = call.parameters["location"] ?: return@get call.respondText("Location not provided", status = io.ktor.http.HttpStatusCode.BadRequest)
 
-                val weatherData = weatherService.getWeather(location)
-                if (weatherData != null) {
-                    call.respond(weatherData)
+            get("/weather/{location}") {
+                val location = call.parameters["location"] ?: return@get call.respond(HttpStatusCode.BadRequest, "Location parameter is missing")
+
+                // Conectar a Redis
+                val redisClient = RedisClient
+
+                // Obtener el valor guardado en Redis
+                val weatherDataJson = redisClient.get(location)
+
+                if (weatherDataJson != null) {
+                    // Deserializar el JSON en un objeto de tipo Data
+                    val weatherData: WeatherResponse? = try {
+                        Json.decodeFromString(weatherDataJson)
+                    } catch (e: Exception) {
+                        println("Error deserializing JSON: ${e.message}")
+                        null
+                    }
+
+                    if (weatherData != null) {
+                        // Devolver la respuesta
+                        call.respond(HttpStatusCode.OK, weatherData)
+                    } else {
+                        // Responder con un error si la deserialización falló
+                        call.respond(HttpStatusCode.InternalServerError, "Failed to deserialize weather data")
+                    }
+
                 } else {
-                    call.respondText("Unable to fetch weather data", status = io.ktor.http.HttpStatusCode.ServiceUnavailable)
+                    // Responder con un error si no se encuentra la localidad
+                    call.respond(HttpStatusCode.NotFound, "Weather data for location '$location' not found")
                 }
+
             }
 
             get("/weather/multiple") {
@@ -83,6 +67,12 @@ fun Application.configureRouting() {
             }
         }
 
-
+        routing {
+            get("/test-redis") {
+                RedisClient.set("testKey", "Hello Liz!")
+                val value = RedisClient.get("testKey")
+                call.respondText("Redis value: $value")
+            }
+        }
     }
 }
