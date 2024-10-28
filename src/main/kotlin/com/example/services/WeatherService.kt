@@ -121,7 +121,7 @@ class WeatherService(private val apiKey: String) {
         Timer().scheduleAtFixedRate(object : TimerTask() {
             override fun run() {
                 runBlocking {
-                    val locations = listOf("UK", "USA")
+                    val locations = listOf("CL", "CH", "NZ", "AU", "UK", "USA")
                     updateWeatherData(locations)
                 }
             }
